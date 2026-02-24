@@ -1,46 +1,51 @@
-local api = vim.api
-local fn = vim.fn
-
+---@class StyluaNvim
 local M = {}
 
-local state = {
-  had_format_err = false,
-}
+M.config = {} ---@type StyluaNvimOpts
 
-local config = {
-  error_display_strategy = "loclist",
-}
+---@class StyluaNvim.State
+---@field had_format_err boolean
+local state = { had_format_err = false }
 
+---@class StyluaNvimOpts
+---@field error_display_strategy? 'loclist'
+---@field config_file? string
+local defaults = { error_display_strategy = 'loclist' }
+
+---@param bufnr integer
+---@return string text
 local function buf_get_full_text(bufnr)
-  local text = table.concat(api.nvim_buf_get_lines(bufnr, 0, -1, true), "\n")
-  if api.nvim_buf_get_option(bufnr, "eol") then
-    text = text .. "\n"
-  end
-  return text
+  return table.concat(vim.api.nvim_buf_get_lines(bufnr, 0, -1, true), '\n')
+    .. (vim.api.nvim_get_option_value('eol', { buf = bufnr }) and '\n' or '')
 end
 
+---@return string flags
 local function create_flags()
-  if config.config_file then
-    return "--config-path " .. config.config_file
-  end
-  return "--search-parent-directories"
+  return M.config.config_file and ('--config-path %s'):format(M.config.config_file)
+    or '--search-parent-directories'
 end
 
+---@param output string
+---@param input string
 local function no_errors(output, input)
   if output ~= input then
-    local new_lines = vim.fn.split(output, "\n")
-    api.nvim_buf_set_lines(0, 0, -1, false, new_lines)
+    vim.api.nvim_buf_set_lines(0, 0, -1, false, vim.split(output, '\n', { trimempty = false }))
   end
+
+  if M.config.error_display_strategy ~= 'loclist' or not state.had_format_err then
+    return
+  end
+
   -- We try a little bit to make sure we aren't closing a loclist that we didn't create.
   -- This isn't perfect in the case of long sessions, but probably better than nothing.
-  if config.error_display_strategy == "loclist" and state.had_format_err then
-    vim.fn.setloclist(0, {})
-    vim.cmd("lclose")
-  end
+  vim.fn.setloclist(0, {})
+  vim.cmd.lclose()
 end
 
+---@param error_file string
+---@param bufnr integer
 local function handle_errors(error_file, bufnr)
-  local errors = table.concat(vim.fn.readfile(error_file), " ")
+  local errors = table.concat(vim.fn.readfile(error_file), ' ')
 
   -- Error messages from stylua have been observed in two general formats:
   --
@@ -60,55 +65,66 @@ local function handle_errors(error_file, bufnr)
   --	- locations[2] = start col
   --	- locations[3] = end line
   --	- locations[4] = end col
-  local locations = {}
-  for num in errors:gmatch("%d+") do
+  local locations = {} ---@type { [1]?: integer, [2]?: integer, [3]?: integer, [4]?: integer }
+  for num in errors:gmatch('%d+') do
     table.insert(locations, num)
   end
 
-  if config.error_display_strategy == "loclist" then
+  if M.config.error_display_strategy == 'loclist' then
     -- Error messages where location information could not be parsed will be given (0, 0) as a
     -- location.
-    vim.fn.setloclist(0, { { bufnr = bufnr, lnum = locations[1] or 0, col = locations[2] or 0, text = errors } })
-    vim.cmd("lopen")
+    vim.fn.setloclist(
+      0,
+      { { bufnr = bufnr, lnum = locations[1] or 0, col = locations[2] or 0, text = errors } }
+    )
+    vim.cmd.lopen()
   end
   state.had_format_err = true
 end
 
-M.format_file = function(user_config, extra_flags)
-  if user_config and user_config.error_display_strategy then
-    config.error_display_strategy = user_config.error_display_strategy
-  end
-  local error_file = fn.tempname()
+---@param user_config? StyluaNvimOpts
+---@param extra_flags? string
+function M.format_file(user_config, extra_flags)
+  user_config = user_config or {}
+  M.config.error_display_strategy = user_config.error_display_strategy
+    or M.config.error_display_strategy
+
+  local error_file = vim.fn.tempname()
   local flags = create_flags()
-
-  local stylua_command = string.format("stylua %s %s - 2> %s", flags, extra_flags or "", error_file)
-
-  local bufnr = vim.fn.bufnr("%")
+  local stylua_command = ('stylua %s %s - 2> %s'):format(flags, extra_flags or '', error_file)
+  local bufnr = vim.fn.bufnr('%')
   local input = buf_get_full_text(bufnr)
-  local output = fn.system(stylua_command, input)
+  local output = vim.fn.system(stylua_command, input)
 
-  if fn.empty(output) == 0 then
+  if vim.fn.empty(output) == 0 then
     no_errors(output, input)
   else
     handle_errors(error_file, bufnr)
   end
 
-  fn.delete(error_file)
+  vim.fn.delete(error_file)
 end
 
-M.format_range = function(start, stop, user_config)
-  local extra_flags = ("--range-start %d"):format(fn.line2byte(start) - 1)
-  if stop == api.nvim_buf_line_count(0) then
+---@param start integer
+---@param stop integer
+---@param user_config? StyluaNvimOpts
+function M.format_range(start, stop, user_config)
+  local extra_flags = ('--range-start %d'):format(vim.fn.line2byte(start) - 1)
+  if stop == vim.api.nvim_buf_line_count(0) then
     M.format_file(user_config, extra_flags)
-  else
-    M.format_file(user_config, extra_flags .. (" --range-end %d"):format(fn.line2byte(stop + 1) - 1))
+    return
   end
+
+  M.format_file(
+    user_config,
+    ('%s --range-end %d'):format(extra_flags, vim.fn.line2byte(stop + 1) - 1)
+  )
 end
 
-M.setup = function(opt)
-  opt = opt or {}
-  config.config_file = opt.config_file
-  config.error_display_strategy = opt.error_display_strategy
+---@param opts? StyluaNvimOpts
+function M.setup(opts)
+  M.config = vim.tbl_deep_extend('keep', opts or {}, defaults)
 end
 
 return M
+-- vim: set ts=2 sts=2 sw=2 et ai si sta:
