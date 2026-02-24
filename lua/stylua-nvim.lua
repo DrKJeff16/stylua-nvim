@@ -124,7 +124,12 @@ end
 ---@param opts? StyluaNvimOpts
 function M.setup(opts)
   M.config = vim.tbl_deep_extend('keep', opts or {}, defaults)
+
+  vim.api.nvim_create_user_command('Stylua', function()
+    M.format_file(M.config)
+  end, {})
 end
 
 return M
 -- vim: set ts=2 sts=2 sw=2 et ai si sta:
+
