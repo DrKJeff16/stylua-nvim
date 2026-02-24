@@ -1,4 +1,4 @@
-*stylua-nvim.txt* stylua-nvim
+*stylua-nvim.txt*                                                    stylua-nvim
 
 A minimal wrapper around https://github.com/JohnnyMorganz/StyLua to provide a
 way to format Lua in an opinionated way while in Nvim, because no one wants to
@@ -16,7 +16,7 @@ CONTENTS                                                           *stylua-nvim*
 ================================================================================
 PREREQUISITES                                        *stylua-nvim-prerequisites*
 
-- Nvim v0.5.x
+- Neovim >=v0.9.0
 - Make sure to have StyLua installed. You can find instructions here:
   https://github.com/JohnnyMorganz/StyLua
 
@@ -24,70 +24,72 @@ PREREQUISITES                                        *stylua-nvim-prerequisites*
 GETTING STARTED                                    *stylua-nvim-getting-started*
 
 Install via your favorite package manager.
->
-  use({"ckipp01/stylua-nvim"})
+>lua
+    -- lazy.nvim
+    {
+        'DrKJeff16/stylua-nvim',
+        cond = vim.fn.executable('stylua') == 1,
+    }
 <
 
 This plugin does not require that setup be called, however it is possible to
 provide additional configuration using the setup function.
->
-  use({"ckipp01/stylua-nvim"},
-      config = function()
-          require("stylua-nvim").setup{config_file = "stylua.toml"}
-      end)
+>lua
+    -- lazy.nvim
+    {
+        'DrKJeff16/stylua-nvim',
+        cond = vim.fn.executable('stylua') == 1,
+        config = function()
+            require("stylua-nvim").setup({
+                config_file = 'stylua.toml',
+            })
+        end,
+    }
 <
 
 Available setup options:
 
-config_file             Specifies a configuration file to use for the StylLua
+    * {config_file}
+                        Specifies a configuration file to use for the StyLua
                         linter. This can be an absolute or relative path. The
                         default value is nothing, which means the linter will
-                        search for a stylua.toml file using the
+                        search for a `stylua.toml` file using the
                         `--search-parent-directories` option of the linter.
 
-error_display_strategy  The mechanism to display errors encountered during
-                        linting. Allowed values are 'loclist' or 'none'. Default
-                        value is 'loclist'.
+    * {error_display_strategy}
+                        The mechanism to display errors encountered during
+                        linting. Allowed values are `'loclist'` or `'none'`.
+                        Default value is `'loclist'`.
 
 ================================================================================
 LUA API                                                    *stylua-nvim-lua-api*
 
 
-                                                           *format_file(config)*
-format_file(config)     Use to format the current buffer. If any issues are
+                                                            *stylua-format_file*
+`format_file(config)`     Use to format the current buffer. If any issues are
                         found, they will be opened in your loclist.
 
                         Takes an optional configuration argument
+>lua
                         {
-                          error_display_strategy = <error_display_string>
+                          error_display_strategy = '<error_display_string>'
                         }
+<
 
                         <error_display_string> options currently are:
-                        * "loclist": display errors in a location list
-                        * "none": do not display stylua errors
+                        * {'loclist'}: display errors in a location list
+                        * {'none'}: do not display StyLua errors
 
 ================================================================================
 Example Usage                                        *stylua-nvim-example-usage*
 
 
-Via a mapping: >
-  local opts = { noremap=true, silent=true }
-  buf_set_keymap("n", "<leader>f", [[<cmd>lua require("stylua-nvim").format_file()<CR>]], opts)
-<
-
-Usage via nvim-lspconfig and sumneko_lua to be able to use `:Format`: >
-
-  local lsp_config = require("lspconfig")
-  lsp_config.sumneko_lua.setup({
-    commands = {
-      Format = {
-        function()
-          require("stylua-nvim").format_file()
-        end,
-      },
-    },
-    ...
-  })
+Via a mapping:
+>lua
+    vim.keymap.set("n", "<leader>lff", require("stylua-nvim").format_file, {
+        noremap = true,
+        silent = true,
+    })
 <
 
 vim:tw=80:ts=2:ft=help:
