@@ -21,8 +21,7 @@ end
 
 ---@return string flags
 local function create_flags()
-  return M.config.config_file and ('--config-path %s'):format(M.config.config_file)
-    or '--search-parent-directories'
+  return M.config.config_file and ('--config-path %s'):format(M.config.config_file) or '--search-parent-directories'
 end
 
 ---@param output string
@@ -73,10 +72,7 @@ local function handle_errors(error_file, bufnr)
   if M.config.error_display_strategy == 'loclist' then
     -- Error messages where location information could not be parsed will be given (0, 0) as a
     -- location.
-    vim.fn.setloclist(
-      0,
-      { { bufnr = bufnr, lnum = locations[1] or 0, col = locations[2] or 0, text = errors } }
-    )
+    vim.fn.setloclist(0, { { bufnr = bufnr, lnum = locations[1] or 0, col = locations[2] or 0, text = errors } })
     vim.cmd.lopen()
   end
   state.had_format_err = true
@@ -86,8 +82,7 @@ end
 ---@param extra_flags? string
 function M.format_file(user_config, extra_flags)
   user_config = user_config or {}
-  M.config.error_display_strategy = user_config.error_display_strategy
-    or M.config.error_display_strategy
+  M.config.error_display_strategy = user_config.error_display_strategy or M.config.error_display_strategy
 
   local error_file = vim.fn.tempname()
   local flags = create_flags()
@@ -115,10 +110,7 @@ function M.format_range(start, stop, user_config)
     return
   end
 
-  M.format_file(
-    user_config,
-    ('%s --range-end %d'):format(extra_flags, vim.fn.line2byte(stop + 1) - 1)
-  )
+  M.format_file(user_config, ('%s --range-end %d'):format(extra_flags, vim.fn.line2byte(stop + 1) - 1))
 end
 
 ---@param opts? StyluaNvimOpts
@@ -132,4 +124,3 @@ end
 
 return M
 -- vim: set ts=2 sts=2 sw=2 et ai si sta:
-
