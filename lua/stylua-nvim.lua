@@ -28,17 +28,21 @@ end
 ---@param input string
 local function no_errors(output, input)
   if output ~= input then
-    vim.api.nvim_buf_set_lines(0, 0, -1, false, vim.split(output, '\n', { trimempty = false }))
+    vim.api.nvim_buf_set_lines(
+      vim.api.nvim_get_current_buf(),
+      0,
+      -1,
+      false,
+      vim.split(output, '\n', { trimempty = false })
+    )
   end
 
-  if M.config.error_display_strategy ~= 'loclist' or not state.had_format_err then
-    return
+  if M.config.error_display_strategy == 'loclist' and state.had_format_err then
+    -- We try a little bit to make sure we aren't closing a loclist that we didn't create.
+    -- This isn't perfect in the case of long sessions, but probably better than nothing.
+    vim.fn.setloclist(0, {})
+    vim.cmd.lclose()
   end
-
-  -- We try a little bit to make sure we aren't closing a loclist that we didn't create.
-  -- This isn't perfect in the case of long sessions, but probably better than nothing.
-  vim.fn.setloclist(0, {})
-  vim.cmd.lclose()
 end
 
 ---@param error_file string
@@ -85,12 +89,10 @@ function M.format_file(user_config, extra_flags)
   M.config.error_display_strategy = user_config.error_display_strategy or M.config.error_display_strategy
 
   local error_file = vim.fn.tempname()
-  local flags = create_flags()
-  local stylua_command = ('stylua %s %s - 2> %s'):format(flags, extra_flags or '', error_file)
-  local bufnr = vim.fn.bufnr('%')
+  local stylua_command = ('stylua %s %s - 2> %s'):format(create_flags(), extra_flags or '', error_file)
+  local bufnr = vim.api.nvim_get_current_buf()
   local input = buf_get_full_text(bufnr)
   local output = vim.fn.system(stylua_command, input)
-
   if vim.fn.empty(output) == 0 then
     no_errors(output, input)
   else
@@ -105,12 +107,11 @@ end
 ---@param user_config? StyluaNvimOpts
 function M.format_range(start, stop, user_config)
   local extra_flags = ('--range-start %d'):format(vim.fn.line2byte(start) - 1)
-  if stop == vim.api.nvim_buf_line_count(0) then
-    M.format_file(user_config, extra_flags)
-    return
-  end
-
-  M.format_file(user_config, ('%s --range-end %d'):format(extra_flags, vim.fn.line2byte(stop + 1) - 1))
+  M.format_file(
+    user_config,
+    stop == vim.api.nvim_buf_line_count(vim.api.nvim_get_current_buf()) and extra_flags
+      or ('%s --range-end %d'):format(extra_flags, vim.fn.line2byte(stop + 1) - 1)
+  )
 end
 
 ---@param opts? StyluaNvimOpts
